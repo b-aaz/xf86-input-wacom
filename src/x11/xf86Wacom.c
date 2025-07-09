@@ -64,6 +64,26 @@ log_sigsafe(WacomLogType type, const char *format, va_list args)
 	LogVMessageVerbSigSafe(xtype, -1, format, args);
 }
 
+void
+wcmLog(WacomDevicePtr priv, WacomLogType type, const char *format, ...)
+{
+	MessageType xtype = (MessageType)type;
+	va_list args,args2;
+	va_start(args, format);
+	va_copy(args2,args);
+
+	int str_size = vsnprintf(NULL, 0, format, args);
+	char *str = calloc(1, str_size + 1);
+	va_end(args);
+
+	vsnprintf(str,str_size + 1, format, args2);
+	va_end(args2);
+
+	xf86IDrvMsgVerb(priv->frontend, xtype, 0, "%s", str);
+
+	free(str);
+}
+
 void wcmLogSafe(WacomDevicePtr priv, WacomLogType type, const char *format, ...)
 {
 	va_list args;
@@ -339,7 +359,7 @@ void wcmQueueHotplug(WacomDevicePtr priv, const char* name, const char *type, un
 
 	if (!hotplug_info)
 	{
-		xf86IDrvMsgVerb(priv->frontend, (MessageType)W_ERROR, 0, "OOM, cannot hotplug dependent devices\n");
+		wcmLog(priv, W_ERROR, "OOM, cannot hotplug dependent devices\n");
 		return;
 	}
 
@@ -662,7 +682,7 @@ int wcmOpen(WacomDevicePtr priv)
 	if (fd < 0)
 	{
 		int saved_errno = errno;
-		xf86IDrvMsgVerb(priv->frontend, (MessageType)W_ERROR, 0, "Error opening %s (%s)\n",
+		wcmLog(priv, W_ERROR, "Error opening %s (%s)\n",
 			common->device_path, strerror(errno));
 		return -saved_errno;
 	}
@@ -692,7 +712,7 @@ static int wcmReady(WacomDevicePtr priv)
 	int n = xf86WaitForInput(pInfo->fd, 0);
 	if (n < 0) {
 		int saved_errno = errno;
-		xf86IDrvMsgVerb(priv->frontend, (MessageType)W_ERROR, 0, "select error: %s\n", strerror(errno));
+		wcmLog(priv, W_ERROR, "select error: %s\n", strerror(errno));
 		return -saved_errno;
 	} else {
 		DBG(10, priv, "%d numbers of data\n", n);
@@ -811,7 +831,7 @@ static int wcmDevProc(DeviceIntPtr pWcm, int what)
 			break;
 #endif
 		default:
-			xf86IDrvMsgVerb(priv->frontend, (MessageType)W_ERROR, 0,
+			wcmLog(priv, W_ERROR,
 				    "invalid mode=%d. This is an X server bug.\n", what);
 			goto out;
 	} /* end switch */
@@ -1082,7 +1102,7 @@ void
 valuator_mask_set_double(ValuatorMask *mask, int valuator, double data)
 {
 	if (mask->has_unaccelerated) {
-		xf86IDrvMsgVerb(NULL, 0, 0, "Do not mix valuator types, zero mask first\n");
+		wcmLog(null, 0, "Do not mix valuator types, zero mask first\n");
 	}
 	_valuator_mask_set_double(mask, valuator, data);
 }
